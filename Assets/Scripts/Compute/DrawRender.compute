@@ -1,0 +1,38 @@
+#pragma kernel DrawRender
+
+Buffer<float> Sample;
+
+RWTexture2D<float4> Result;
+uint GridDim;
+
+// https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops
+[numthreads(256, 1, 1)]
+void DrawRender(uint3 threadIdx : SV_GroupThreadID, uint3 blockIdx : SV_GroupID)
+{
+    uint2 resultDims;
+    Result.GetDimensions(resultDims.x, resultDims.y);
+    
+    uint sampleDim;
+    Sample.GetDimensions(sampleDim);
+    uint sampleStep = sampleDim / resultDims.x;
+    for (uint y = (blockIdx.x * 256) + threadIdx.x; y < resultDims.x; y += GridDim * 256)
+    {
+        float sampleVal   = 0.0f;
+        uint validSamples = 0;
+        uint startRange   = ((y - 1) > 0 ? y - 1 : 0) * sampleStep;
+        for (uint i = startRange; i < y * sampleStep; i++)
+        {
+            sampleVal    += Sample[i];
+            validSamples += Sample[i] > 0.0f;
+
+        }
+        sampleVal /= validSamples;
+        
+        uint scaledSample = sampleVal * resultDims.y;
+        for (uint x = 0; x < resultDims.y; x++)
+        {
+            float pred = x < scaledSample;
+            Result[uint2(y, x)] = float4(pred, pred, pred, 1.0f);
+        }
+    }
+}
