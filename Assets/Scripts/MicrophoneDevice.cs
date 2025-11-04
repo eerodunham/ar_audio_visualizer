@@ -110,7 +110,8 @@ public sealed class MicrophoneDevice : IDisposable
         currentSample = MicrophoneQueryMethods.GetRecordPosition(cachedID);
 
         Debug.Assert(fftProps.ComputeFFT());
-        Debug.Log(result[0]);
+        Debug.Assert(fftProps.ProcessSignal(out var handle));
+        handle.Complete();
     }
 
     public void Dispose()

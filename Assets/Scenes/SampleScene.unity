@@ -366,11 +366,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1214120185}
-  - component: {fileID: 1214120186}
   - component: {fileID: 1214120188}
   - component: {fileID: 1214120187}
   m_Layer: 0
-  m_Name: AudioTest
+  m_Name: PCM
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -395,22 +394,6 @@ RectTransform:
   m_AnchoredPosition: {x: -295.9, y: 0.1}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1214120186
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1214120184}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4bfafa1880d0fa4419c39524a30a726e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AudioReader
-  visShader: {fileID: 7200000, guid: d66c6b6e2ddcc584eaf77f94030709b5, type: 3}
-  texture: {fileID: 0}
-  sprite: {fileID: 0}
-  imageUI: {fileID: 1214120187}
 --- !u!114 &1214120187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -746,6 +729,7 @@ GameObject:
   - component: {fileID: 2095710387}
   - component: {fileID: 2095710386}
   - component: {fileID: 2095710385}
+  - component: {fileID: 2095710389}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -837,6 +821,20 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &2095710389
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2095710384}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bfafa1880d0fa4419c39524a30a726e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AudioReader
+  visShader: {fileID: 7200000, guid: d66c6b6e2ddcc584eaf77f94030709b5, type: 3}
+  imageUI: {fileID: 1214120187}
 --- !u!1001 &5339021968817259872
 PrefabInstance:
   m_ObjectHideFlags: 0
