@@ -7,6 +7,8 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
+using Unity.Mathematics;
+using Unity.Collections.LowLevel.Unsafe;
 
 public static class MicrophoneQueryMethods
 {
@@ -58,7 +60,10 @@ public sealed class MicrophoneDevice : IDisposable
 
     private int currentSample;
 
-    private NativeArray<float> sampledData;
+    private NativeArray<float>  sampledData;
+    private NativeArray<float2> complexData;
+
+    private FFTProperties props;
 
     public string DeviceName       => deviceName;
     public int Samples             => samples;
@@ -66,10 +71,13 @@ public sealed class MicrophoneDevice : IDisposable
 
     private MicrophoneDevice()
     {
-        deviceName = null;
-        audioClip  = null;
-        cachedID   = -1;
-        samples    = 0;
+        deviceName  = null;
+        audioClip   = null;
+        cachedID    = -1;
+        samples     = 0;
+
+        sampledData = default;
+        complexData = default;
     }
 
     public MicrophoneDevice(string deviceName, int samples = 44100)
@@ -82,7 +90,13 @@ public sealed class MicrophoneDevice : IDisposable
         cachedID = MicrophoneQueryMethods.GetMicrophoneDeviceID(deviceName);
         Debug.Assert(cachedID != -1);
 
-        sampledData = new NativeArray<float>(samples, Allocator.Persistent);
+        sampledData = new NativeArray<float>(samples,  Allocator.Persistent);
+        complexData = new NativeArray<float2>(samples, Allocator.Persistent);
+
+        UnsafeText text = new(deviceName.Length, Allocator.Temp);
+        text.Append($"{samples}Wisdom");
+        bool isSuccessful = FFTProperties.Create(sampledData.AsReadOnlySpan(), complexData.AsReadOnlySpan(), text, out props);
+        Debug.Assert(isSuccessful);
     }
 
     public void Start()
@@ -104,6 +118,9 @@ public sealed class MicrophoneDevice : IDisposable
 
         sampledData.Dispose();
         sampledData = default;
+
+        complexData.Dispose();
+        complexData = default;
     }
 }
 
@@ -123,6 +140,8 @@ public sealed class AudioReader : MonoBehaviour
     private Image imageUI;
 
     private int gridDim = 1024 / 128;
+
+    private NativeArray<float2> complex;
 
     void Start()
     {
@@ -148,7 +167,6 @@ public sealed class AudioReader : MonoBehaviour
         microphone.Start();
 
         using CommandBuffer commandBuffer = new();
-        
         commandBuffer.SetComputeIntParam(visShader,        "GridDim", gridDim);
         commandBuffer.SetComputeBufferParam(visShader,  0, "Sample",  gpuBuffer);
         commandBuffer.SetComputeTextureParam(visShader, 0, "Result",  texture);
