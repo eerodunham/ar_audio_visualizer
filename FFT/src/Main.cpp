@@ -27,7 +27,7 @@ using std::cout, std::endl;
 struct FFTProperties {
 	FFTProperties() = delete;
 
-	static std::optional<FFTProperties> Create(gsl::not_null<const float*> signalPtr, gsl::not_null<std::complex<float>*> complexPtr, const size_t length, const std::string_view& fileName) {
+	static std::optional<FFTProperties> Create(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> complexPtr, const size_t length, const std::string_view& fileName) {
 		if (length == 0) [[unlikely]] {
 			return std::nullopt;
 		}
@@ -52,7 +52,7 @@ struct FFTProperties {
 	}
 
 	void CalculateDFT() {
-		DispatchFFT(signalPtr, complexPtr, length, FFTW_WISDOM_ONLY);
+		DispatchFFT(signalPtr, outPtr, length, FFTW_WISDOM_ONLY);
 	}
 
 	size_t Size() const noexcept {
@@ -61,21 +61,20 @@ struct FFTProperties {
 
 private:
 	gsl::not_null<const float*> signalPtr;
-	gsl::not_null<std::complex<float>*> complexPtr;
+	gsl::not_null<float*> outPtr;
 	size_t length;
 
-	FFTProperties(gsl::not_null<const float*> signalPtr, gsl::not_null<std::complex<float>*> complexPtr, const size_t length) : signalPtr(signalPtr), complexPtr(complexPtr), length(length) {}
+	FFTProperties(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length) : signalPtr(signalPtr), outPtr(outPtr), length(length) {}
 
-	static void DispatchFFT(gsl::not_null<const float*> signalPtr, gsl::not_null<std::complex<float>*> complexPtr, const size_t length, const int32_t flags) {
+	static void DispatchFFT(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length, const int32_t flags) {
 		auto fftwInCast  = const_cast<float*>(signalPtr.get());
-		auto fftwOutCast = reinterpret_cast<fftwf_complex*>(complexPtr.get());
-		fftwf_plan plan  = fftwf_plan_dft_r2c_1d(length, fftwInCast, fftwOutCast, flags);
+		fftwf_plan plan  = fftwf_plan_r2r_1d(length, fftwInCast, outPtr, FFTW_REDFT11, flags);
 		fftwf_execute(plan);
 	}
 };
 
-LibFunc bool CreateFFTProps(const float* signalPtr, std::complex<float>* complexPtr, const size_t length, const char* fileName, FFTProperties& props) {
-	auto result = FFTProperties::Create(signalPtr, complexPtr, length, std::string_view(fileName));
+LibFunc bool CreateFFTProps(const float* signalPtr, float* outPtr, const size_t length, const char* fileName, FFTProperties& props) {
+	auto result = FFTProperties::Create(signalPtr, outPtr, length, std::string_view(fileName));
 	if (result.has_value()) {
 		props = result.value();
 		return true;

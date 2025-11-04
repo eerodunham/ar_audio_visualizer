@@ -58,14 +58,14 @@ public sealed class MicrophoneDevice : IDisposable
 
     private int currentSample;
 
-    private NativeArray<float>  sampledData;
-    private NativeArray<float2> complexData;
+    private NativeArray<float> pcmData;
+    private NativeArray<float> result;
 
     private FFTProperties fftProps;
 
     public string DeviceName       => deviceName;
     public int Samples             => samples;
-    public NativeArray<float> Data => sampledData;
+    public NativeArray<float> PCM => pcmData;
 
     private MicrophoneDevice()
     {
@@ -74,8 +74,8 @@ public sealed class MicrophoneDevice : IDisposable
         cachedID    = -1;
         samples     = 0;
 
-        sampledData = default;
-        complexData = default;
+        pcmData = default;
+        result  = default;
     }
 
     public MicrophoneDevice(string deviceName, int samples = 44100)
@@ -88,12 +88,12 @@ public sealed class MicrophoneDevice : IDisposable
         cachedID = MicrophoneQueryMethods.GetMicrophoneDeviceID(deviceName);
         Debug.Assert(cachedID != -1);
 
-        sampledData = new NativeArray<float>(samples,  Allocator.Persistent);
-        complexData = new NativeArray<float2>(samples, Allocator.Persistent);
+        pcmData = new NativeArray<float>(samples, Allocator.Persistent);
+        result  = new NativeArray<float>(samples, Allocator.Persistent);
 
         UnsafeText text = new(deviceName.Length, Allocator.Temp);
         text.Append($"{samples}Wisdom.dat");
-        bool isSuccessful = FFTProperties.TryCreate(sampledData.AsReadOnlySpan(), complexData.AsReadOnlySpan(), text, out fftProps);
+        bool isSuccessful = FFTProperties.TryCreate(pcmData.AsReadOnlySpan(), result.AsReadOnlySpan(), text, out fftProps);
         Debug.Assert(isSuccessful);
     }
 
@@ -106,20 +106,21 @@ public sealed class MicrophoneDevice : IDisposable
 
     public void Write()
     {
-        audioClip.GetData(sampledData.AsSpan(), offsetSamples: currentSample);
+        audioClip.GetData(pcmData.AsSpan(), offsetSamples: currentSample);
         currentSample = MicrophoneQueryMethods.GetRecordPosition(cachedID);
 
-        fftProps.ComputeFFT();
+        Debug.Assert(fftProps.ComputeFFT());
+        Debug.Log(result[0]);
     }
 
     public void Dispose()
     {
         audioClip = null;
 
-        sampledData.Dispose();
-        sampledData = default;
+        pcmData.Dispose();
+        pcmData = default;
 
-        complexData.Dispose();
-        complexData = default;
+        result.Dispose();
+        result = default;
     }
 }

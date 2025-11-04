@@ -58,7 +58,7 @@ public sealed class AudioReader : MonoBehaviour
         microphone.Write();
 
         using CommandBuffer commandBuffer = new();
-        commandBuffer.SetBufferData(gpuBuffer, microphone.Data);
+        commandBuffer.SetBufferData(gpuBuffer, microphone.PCM);
         commandBuffer.DispatchCompute(visShader, 0, gridDim, 1, 1);
         commandBuffer.CopyTexture(texture, spriteTexture);
         Graphics.ExecuteCommandBuffer(commandBuffer);
