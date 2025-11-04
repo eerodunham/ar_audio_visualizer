@@ -63,9 +63,10 @@ public sealed class MicrophoneDevice : IDisposable
 
     private FFTProperties fftProps;
 
-    public string DeviceName       => deviceName;
-    public int Samples             => samples;
-    public NativeArray<float> PCM => pcmData;
+    public string DeviceName         => deviceName;
+    public int Samples               => samples;
+    public NativeArray<float> PCM    => pcmData;
+    public NativeArray<float> Result => result;
 
     private MicrophoneDevice()
     {
@@ -93,7 +94,7 @@ public sealed class MicrophoneDevice : IDisposable
 
         UnsafeText text = new(deviceName.Length, Allocator.Temp);
         text.Append($"{samples}Wisdom.dat");
-        bool isSuccessful = FFTProperties.TryCreate(pcmData.AsReadOnlySpan(), result.AsReadOnlySpan(), text, out fftProps);
+        bool isSuccessful = FFTProperties.TryCreate(pcmData, result, text, out fftProps);
         Debug.Assert(isSuccessful);
     }
 
@@ -111,7 +112,6 @@ public sealed class MicrophoneDevice : IDisposable
 
         Debug.Assert(fftProps.ComputeFFT());
         Debug.Assert(fftProps.ProcessSignal(out var handle));
-        handle.Complete();
     }
 
     public void Dispose()

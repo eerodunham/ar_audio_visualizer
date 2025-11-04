@@ -17,15 +17,24 @@ namespace Impl
     [BurstCompile]
     public struct ProcessSignalJob : IJob
     {
-        [NativeDisableUnsafePtrRestriction]
-        public unsafe float* complexPtr;
+        [NativeDisableUnsafePtrRestriction, NoAlias]
+        public unsafe float* outPtr;
         public int length;
 
         public unsafe void Execute()
         {
+            float min = float.MaxValue;
+            float max = float.MinValue;
             for (int i = 0; i < length; i++)
             {
-                complexPtr[i] = math.abs(complexPtr[i]);
+                outPtr[i] = math.abs(outPtr[i]);
+                min = math.min(min, outPtr[i]);
+                max = math.max(max, outPtr[i]);
+            }
+            float recipExt = 1.0f / (max - min);
+            for (int i = 0; i < length; i++)
+            {
+                outPtr[i] = (outPtr[i] - min) * recipExt;
             }
         }
     }
@@ -35,31 +44,28 @@ namespace Impl
 public struct FFTProperties
 {
     [DllImport("AudioVisFFT")]
-    private static unsafe extern bool CreateFFTProps(float* signalPtr, float* complexPtr, ulong length, char* fileName, ref FFTProperties props);
+    private static unsafe extern bool CreateFFTProps(float* signalPtr, float* outPtr, ulong length, char* fileName, ref FFTProperties props);
 
     [DllImport("AudioVisFFT")]
     private static unsafe extern void ComputeFFT(ref FFTProperties props);
 
-    private unsafe float*  signalPtr;
-    private unsafe float* complexPtr;
+    private unsafe float* signalPtr;
+    private unsafe float* outPtr;
     private ulong length;
 
-    public unsafe readonly bool IsValid => signalPtr != null && complexPtr != null && length > 0;
+    public unsafe readonly bool IsValid => signalPtr != null && outPtr != null && length > 0;
 
-    public static unsafe bool TryCreate<T>(in ReadOnlySpan<float> signal, in ReadOnlySpan<float> complex, T str, out FFTProperties props) where T : unmanaged, IUTF8Bytes
+    public static unsafe bool TryCreate<T>(in NativeArray<float> signal, in NativeArray<float> outData, T str, out FFTProperties props) where T : unmanaged, IUTF8Bytes
     {
         props = default;
-        if (Hint.Unlikely(signal.Length == 0 || signal.Length != complex.Length))
+        if (Hint.Unlikely(signal.Length == 0 || signal.Length != outData.Length))
         {
             return false;
         }
-        fixed (float* signalPtr = signal)
-        {
-            fixed (float* complexPtr = complex)
-            {
-                return CreateFFTProps(signalPtr, complexPtr, unchecked((ulong) signal.Length), (char*) str.GetUnsafePtr(), ref props);
-            }
-        }
+
+        float* signalPtr = (float*) signal.GetUnsafePtr();
+        float* outPtr    = (float*) outData.GetUnsafePtr();
+        return CreateFFTProps(signalPtr, outPtr, unchecked((ulong) signal.Length), (char*) str.GetUnsafePtr(), ref props);
     }
 
     public unsafe bool ComputeFFT()
@@ -82,10 +88,11 @@ public struct FFTProperties
         }
         ProcessSignalJob processJob = new()
         {
-            complexPtr = complexPtr,
-            length     = unchecked((int) length)
+            outPtr = outPtr,
+            length = unchecked((int) length)
         };
         handleOut = processJob.Schedule(handleIn);
+        handleOut.Complete();
         return true;
     }
 }

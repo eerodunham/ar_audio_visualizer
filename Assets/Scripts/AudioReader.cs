@@ -1,14 +1,30 @@
+using System;
+
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
+
+[Serializable]
+public struct VisEntry
+{
+    public ComputeShader visShader;
+    public Image         imageUI;
+}
+
+[Serializable]
+public struct MicrophoneVis
+{
+    public VisEntry pcmVis;
+    public VisEntry outVis;
+}
 
 [DisallowMultipleComponent]
 public sealed class AudioReader : MonoBehaviour
 {
-    [SerializeField] private ComputeShader visShader;
-    [SerializeField] private Image imageUI;
+    [SerializeField] private MicrophoneVis vis;
 
     private MicrophoneDevice microphone;
-    private SignalVisualizer signalVis;
+    private SignalVisualizer pcmVis, outVis;
 
     void Start()
     {
@@ -18,18 +34,25 @@ public sealed class AudioReader : MonoBehaviour
         string defaultDevice = deviceNames[0];
         microphone = new MicrophoneDevice(defaultDevice, 44100);
         microphone.Start();
-        signalVis  = new SignalVisualizer(microphone, visShader, imageUI);
+
+        pcmVis = new SignalVisualizer(microphone, vis.pcmVis.visShader, vis.pcmVis.imageUI, BufferType.PCM);
+        outVis = new SignalVisualizer(microphone, vis.outVis.visShader, vis.outVis.imageUI, BufferType.Result);
     }
 
     void Update()
     {
         microphone.Write();
-        signalVis.Dispatch();
+        Debug.Log(microphone.PCM[0]);
+
+        using CommandBuffer commandBuffer = new();
+        pcmVis.Dispatch(commandBuffer);
+        outVis.Dispatch(commandBuffer);
+        Graphics.ExecuteCommandBuffer(commandBuffer);
     }
 
     void OnDestroy()
     {
         microphone.Dispose();
-        signalVis.Dispose();
+        pcmVis.Dispose();
     }
 }
