@@ -27,7 +27,7 @@ namespace Impl
             float max = float.MinValue;
             for (int i = 0; i < length; i++)
             {
-                outPtr[i] = math.abs(outPtr[i]);
+                outPtr[i] = math.mul(outPtr[i], outPtr[i]);
                 min = math.min(min, outPtr[i]);
                 max = math.max(max, outPtr[i]);
             }
@@ -92,7 +92,6 @@ public struct FFTProperties
             length = unchecked((int) length)
         };
         handleOut = processJob.Schedule(handleIn);
-        handleOut.Complete();
         return true;
     }
 }

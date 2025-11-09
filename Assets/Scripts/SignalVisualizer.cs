@@ -39,7 +39,6 @@ public sealed class SignalVisualizer : IDisposable
 
         this.visShader  = visShader;
         this.microphone = microphone;
-        gpuBuffer       = new GraphicsBuffer(GraphicsBuffer.Target.Structured, microphone.Samples, sizeof(float));
         texture         = new RenderTexture(ImageDimensions, ImageDimensions, 0, RenderTextureFormat.ARGB32, 0)
         {
             enableRandomWrite = true
@@ -50,18 +49,19 @@ public sealed class SignalVisualizer : IDisposable
         this.imageUI        = imageUI;
         this.imageUI.sprite = sprite;
 
-        using CommandBuffer commandBuffer = new();
-        commandBuffer.SetComputeIntParam(visShader, "GridDim", GridDimensions);
-        commandBuffer.SetComputeBufferParam(visShader,  0, "Sample", gpuBuffer);
-        commandBuffer.SetComputeTextureParam(visShader, 0, "Result", texture);
-        Graphics.ExecuteCommandBuffer(commandBuffer);
-
         output = bufferType switch
         {
             BufferType.PCM    => microphone.PCM,
-            BufferType.Result => microphone.Result,
+            BufferType.Result => microphone.Result.GetSubArray(0, microphone.Samples / 8),
             _ => throw new NotImplementedException()
         };
+        gpuBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, output.Length, sizeof(float));
+
+        using CommandBuffer commandBuffer = new();
+        commandBuffer.SetComputeIntParam(visShader, "GridDim", GridDimensions);
+        commandBuffer.SetComputeBufferParam(visShader, 0,  "Sample", gpuBuffer);
+        commandBuffer.SetComputeTextureParam(visShader, 0, "Result", texture);
+        Graphics.ExecuteCommandBuffer(commandBuffer);
     }
 
     public void Dispatch(CommandBuffer commandBuffer)

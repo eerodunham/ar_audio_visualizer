@@ -42,7 +42,6 @@ public sealed class AudioReader : MonoBehaviour
     void Update()
     {
         microphone.Write();
-        Debug.Log(microphone.PCM[0]);
 
         using CommandBuffer commandBuffer = new();
         pcmVis.Dispatch(commandBuffer);

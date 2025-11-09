@@ -112,6 +112,7 @@ public sealed class MicrophoneDevice : IDisposable
 
         Debug.Assert(fftProps.ComputeFFT());
         Debug.Assert(fftProps.ProcessSignal(out var handle));
+        handle.Complete();
     }
 
     public void Dispose()
