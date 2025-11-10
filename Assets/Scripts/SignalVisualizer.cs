@@ -52,7 +52,7 @@ public sealed class SignalVisualizer : IDisposable
         output = bufferType switch
         {
             BufferType.PCM    => microphone.PCM,
-            BufferType.Result => microphone.Result.GetSubArray(0, microphone.Samples / 8),
+            BufferType.Result => microphone.Result.GetSubArray(0, microphone.SampleRate),
             _ => throw new NotImplementedException()
         };
         gpuBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, output.Length, sizeof(float));

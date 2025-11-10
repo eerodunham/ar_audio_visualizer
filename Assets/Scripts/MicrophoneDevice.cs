@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Reflection;
+using System.Threading;
 
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -54,9 +55,12 @@ public sealed class MicrophoneDevice : IDisposable
     private readonly string deviceName;
     private readonly int    cachedID;
     private readonly int    samples;
-    private AudioClip       audioClip;
+    private readonly int    sampleRate;
+
+    private AudioClip audioClip;
 
     private int currentSample;
+    private int currentWindow;
 
     private NativeArray<float> pcmData;
     private NativeArray<float> result;
@@ -65,6 +69,8 @@ public sealed class MicrophoneDevice : IDisposable
 
     public string DeviceName         => deviceName;
     public int Samples               => samples;
+    public int SampleRate            => sampleRate;
+
     public NativeArray<float> PCM    => pcmData;
     public NativeArray<float> Result => result;
 
@@ -72,6 +78,7 @@ public sealed class MicrophoneDevice : IDisposable
     {
         deviceName  = null;
         audioClip   = null;
+
         cachedID    = -1;
         samples     = 0;
 
@@ -79,12 +86,14 @@ public sealed class MicrophoneDevice : IDisposable
         result  = default;
     }
 
-    public MicrophoneDevice(string deviceName, int samples = 44100)
+    public MicrophoneDevice(string deviceName, int samples = 44100, int sampleRate = 441)
     {
         Debug.Assert(deviceName != null && deviceName.Length > 0);
-        Debug.Assert(samples > 0);
+        Debug.Assert(samples    > 0);
+        Debug.Assert(sampleRate > 0 && math.frac(samples / (float) sampleRate) == 0.0f, "Sample rate is not cleanly divisible.");
         this.deviceName = deviceName;
         this.samples    = samples;
+        this.sampleRate = sampleRate;
 
         cachedID = MicrophoneQueryMethods.GetMicrophoneDeviceID(deviceName);
         Debug.Assert(cachedID != -1);
@@ -93,10 +102,23 @@ public sealed class MicrophoneDevice : IDisposable
         result  = new NativeArray<float>(samples, Allocator.Persistent);
 
         UnsafeText text = new(deviceName.Length, Allocator.Temp);
-        text.Append($"{samples}Wisdom.dat");
-        bool isSuccessful = FFTProperties.TryCreate(pcmData, result, text, out fftProps);
+        text.Append($"{sampleRate}Wisdom.dat");
+        bool isSuccessful = FFTProperties.TryCreate(pcmData, result, text, samples / sampleRate, out fftProps);
         Debug.Assert(isSuccessful);
     }
+
+    public void Write()
+    {
+        audioClip.GetData(pcmData.AsSpan(), offsetSamples: currentSample);
+        currentSample = MicrophoneQueryMethods.GetRecordPosition(cachedID);
+
+        Debug.Assert(fftProps.ComputeFFT(currentWindow));
+        Debug.Assert(fftProps.ProcessSignal(out var handle));
+        handle.Complete();
+
+        currentWindow = math.clamp(++currentWindow, 0, sampleRate - 1);
+    }
+
 
     public void Start()
     {
@@ -104,16 +126,6 @@ public sealed class MicrophoneDevice : IDisposable
     }
 
     public void End() => MicrophoneQueryMethods.StopRecording(cachedID);
-
-    public void Write()
-    {
-        audioClip.GetData(pcmData.AsSpan(), offsetSamples: currentSample);
-        currentSample = MicrophoneQueryMethods.GetRecordPosition(cachedID);
-
-        Debug.Assert(fftProps.ComputeFFT());
-        Debug.Assert(fftProps.ProcessSignal(out var handle));
-        handle.Complete();
-    }
 
     public void Dispose()
     {

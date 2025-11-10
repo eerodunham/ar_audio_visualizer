@@ -27,12 +27,12 @@ using std::cout, std::endl;
 struct FFTProperties {
 	FFTProperties() = delete;
 
-	static std::optional<FFTProperties> Create(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> complexPtr, const size_t length, const std::string_view& fileName) {
-		if (length == 0) [[unlikely]] {
+	static std::optional<FFTProperties> Create(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> complexPtr, const size_t interval, const size_t length, const std::string_view& fileName) {
+		if (length == 0 || interval == 0) [[unlikely]] {
 			return std::nullopt;
 		}
 		if (!std::filesystem::exists(fileName)) {
-			DispatchFFT(signalPtr, complexPtr, length, FFTW_MEASURE);
+			DispatchFFT(signalPtr, complexPtr, length, interval, 0, FFTW_MEASURE);
 			char* wisdomData = fftwf_export_wisdom_to_string();
 			if (wisdomData == nullptr) [[unlikely]] {
 				return std::nullopt;
@@ -48,11 +48,11 @@ struct FFTProperties {
 			fftwf_import_wisdom_from_string(fileContents.data());
 		}
 
-		return FFTProperties(signalPtr, complexPtr, length);
+		return FFTProperties(signalPtr, complexPtr, interval, length);
 	}
 
-	void CalculateDFT() {
-		DispatchFFT(signalPtr, outPtr, length, FFTW_WISDOM_ONLY);
+	void CalculateDFT(const size_t intervalOffset) {
+		DispatchFFT(signalPtr, outPtr, length, interval, intervalOffset, FFTW_WISDOM_ONLY);
 	}
 
 	size_t Size() const noexcept {
@@ -62,19 +62,21 @@ struct FFTProperties {
 private:
 	gsl::not_null<const float*> signalPtr;
 	gsl::not_null<float*> outPtr;
+	size_t interval;
 	size_t length;
 
-	FFTProperties(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length) : signalPtr(signalPtr), outPtr(outPtr), length(length) {}
+	FFTProperties(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t interval, const size_t length) : signalPtr(signalPtr), outPtr(outPtr), interval(interval), length(length) {}
 
-	static void DispatchFFT(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length, const int32_t flags) {
+	static void DispatchFFT(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length, const size_t interval, const size_t intervalOffset, const int32_t flags) {
 		auto fftwInCast  = const_cast<float*>(signalPtr.get());
-		fftwf_plan plan  = fftwf_plan_r2r_1d(length, fftwInCast, outPtr, FFTW_REDFT11, flags);
+
+		fftwf_plan plan  = fftwf_plan_r2r_1d(interval, fftwInCast, outPtr.get(), FFTW_REDFT11, flags);
 		fftwf_execute(plan);
 	}
 };
 
-LibFunc bool CreateFFTProps(const float* signalPtr, float* outPtr, const size_t length, const char* fileName, FFTProperties& props) {
-	auto result = FFTProperties::Create(signalPtr, outPtr, length, std::string_view(fileName));
+LibFunc bool CreateFFTProps(const float* signalPtr, float* outPtr, const size_t length, const size_t interval, const char* fileName, FFTProperties& props) {
+	auto result = FFTProperties::Create(signalPtr, outPtr, length, interval, std::string_view(fileName));
 	if (result.has_value()) {
 		props = result.value();
 		return true;
@@ -82,6 +84,6 @@ LibFunc bool CreateFFTProps(const float* signalPtr, float* outPtr, const size_t 
 	return false;
 }
 
-LibFunc void ComputeFFT(FFTProperties& properties) {
-	properties.CalculateDFT();
+LibFunc void ComputeFFT(FFTProperties& properties, const size_t intervalOffset) {
+	properties.CalculateDFT(intervalOffset);
 }
