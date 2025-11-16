@@ -65,6 +65,8 @@ public sealed class MicrophoneDevice : IDisposable
     private NativeArray<float> pcmData;
     private NativeArray<float> result;
 
+    private NativeArray<float>.ReadOnly window;
+
     private FFTProperties fftProps;
 
     public string DeviceName         => deviceName;
@@ -86,14 +88,14 @@ public sealed class MicrophoneDevice : IDisposable
         result  = default;
     }
 
-    public MicrophoneDevice(string deviceName, int samples = 44100, int sampleRate = 441)
+    public MicrophoneDevice(string deviceName, in NativeArray<float>.ReadOnly window, int samples = 44100)
     {
         Debug.Assert(deviceName != null && deviceName.Length > 0);
         Debug.Assert(samples    > 0);
-        Debug.Assert(sampleRate > 0 && math.frac(samples / (float) sampleRate) == 0.0f, "Sample rate is not cleanly divisible.");
         this.deviceName = deviceName;
         this.samples    = samples;
-        this.sampleRate = sampleRate;
+        this.sampleRate = samples / window.Length;
+        Debug.Assert(sampleRate > 0 && math.frac(samples / (float) sampleRate) == 0.0f, "Sample rate is not cleanly divisible.");
 
         cachedID = MicrophoneQueryMethods.GetMicrophoneDeviceID(deviceName);
         Debug.Assert(cachedID != -1);
@@ -103,7 +105,7 @@ public sealed class MicrophoneDevice : IDisposable
 
         UnsafeText text = new(deviceName.Length, Allocator.Temp);
         text.Append($"{sampleRate}Wisdom.dat");
-        bool isSuccessful = FFTProperties.TryCreate(pcmData, result, text, samples / sampleRate, out fftProps);
+        bool isSuccessful = FFTProperties.TryCreate(pcmData, result, window, text, out fftProps);
         Debug.Assert(isSuccessful);
     }
 

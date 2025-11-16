@@ -38,35 +38,55 @@ namespace Impl
             }
         }
     }
+
+    [BurstCompile]
+    public struct HammingWindowJob : IJob
+    {
+        [NativeDisableUnsafePtrRestriction, NoAlias]
+        public unsafe float* outPtr;
+        public int length;
+
+        public unsafe void Execute()
+        {
+            float recipLength = 1.0f / length;
+            for (int i = 0; i < length; i++)
+            {
+                float cosTerm = (math.PI2 * i) * recipLength;
+                outPtr[i]     = 0.54f - (0.46f * math.cos(cosTerm));
+            }
+        }
+    }
 }
 
 [BurstCompile]
 public struct FFTProperties
 {
     [DllImport("AudioVisFFT")]
-    private static unsafe extern bool CreateFFTProps(float* signalPtr, float* outPtr, ulong length, ulong interval, char* fileName, ref FFTProperties props);
+    private static unsafe extern bool CreateFFTProps(float* signalPtr, float* outPtr, float* windowPtr, ulong length, ulong interval, char* fileName, ref FFTProperties props);
 
     [DllImport("AudioVisFFT")]
     private static unsafe extern void ComputeFFT(ref FFTProperties props, ulong intervalOffset);
 
     private unsafe float* signalPtr;
+    private unsafe float* windowPtr;
     private unsafe float* outPtr;
     private ulong length;
     private ulong interval;
 
     public unsafe readonly bool IsValid => signalPtr != null && outPtr != null && length > 0 && interval > 0;
 
-    public static unsafe bool TryCreate<T>(in NativeArray<float> signal, in NativeArray<float> outData, T str, int interval, out FFTProperties props) where T : unmanaged, IUTF8Bytes
+    public static unsafe bool TryCreate<T>(in NativeArray<float> signal, in NativeArray<float> outData, in NativeArray<float>.ReadOnly windowData, T str, out FFTProperties props) where T : unmanaged, IUTF8Bytes
     {
         props = default;
-        if (Hint.Unlikely(signal.Length == 0 || signal.Length != outData.Length))
+        if (Hint.Unlikely(signal.Length == 0 || signal.Length != outData.Length || windowData.Length == 0))
         {
             return false;
         }
 
         float* signalPtr = (float*) signal.GetUnsafePtr();
         float* outPtr    = (float*) outData.GetUnsafePtr();
-        return CreateFFTProps(signalPtr, outPtr, unchecked((ulong) signal.Length), unchecked((ulong) interval), (char*) str.GetUnsafePtr(), ref props);
+        float* windowPtr = (float*) windowData.GetUnsafeReadOnlyPtr();
+        return CreateFFTProps(signalPtr, outPtr, windowPtr, unchecked((ulong) signal.Length), unchecked((ulong) windowData.Length), (char*) str.GetUnsafePtr(), ref props);
     }
 
     public unsafe bool ComputeFFT(int intervalOffset)

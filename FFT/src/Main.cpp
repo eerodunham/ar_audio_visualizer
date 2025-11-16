@@ -45,7 +45,7 @@ private:
 struct FFTProperties {
 	FFTProperties() = delete;
 
-	static std::optional<FFTProperties> Create(const NotNullSpan<const float>& signal, const NotNullSpan<float>& out, const NotNullSpan<const float>& window, const std::string_view& fileName) {
+	static std::optional<FFTProperties> Create(const NotNullSpan<float>& signal, const NotNullSpan<float>& out, const NotNullSpan<const float>& window, const std::string_view& fileName) {
 		if (signal.Size() == 0 || (signal.Size() != out.Size()) || window.Size() == 0) [[unlikely]] {
 			return std::nullopt;
 		}
@@ -69,7 +69,16 @@ struct FFTProperties {
 		return FFTProperties(signal.Data(), out.Data(), window.Data(), window.Size(), signal.Size());
 	}
 
+	void ApplyWindow(const size_t intervalOffset) {
+		std::span<const float> windowSpan(windowPtr.get(), interval);
+		std::span<float> signalSpan(signalPtr.get() + (interval * intervalOffset), interval);
+		for (size_t i = 0; i < interval; i++) {
+			signalSpan[i] *= windowSpan[i];
+		}
+	}
+
 	void CalculateDFT(const size_t intervalOffset) {
+		ApplyWindow(intervalOffset);
 		DispatchFFT(signalPtr, outPtr, length, interval, intervalOffset, FFTW_WISDOM_ONLY);
 	}
 
@@ -78,13 +87,13 @@ struct FFTProperties {
 	}
 
 private:
-	gsl::not_null<const float*> signalPtr;
+	gsl::not_null<float*> signalPtr;
 	gsl::not_null<const float*> windowPtr;
 	gsl::not_null<float*> outPtr;
 	size_t interval;
 	size_t length;
 
-	FFTProperties(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, gsl::not_null<const float*> windowPtr, const size_t interval, const size_t length) :
+	FFTProperties(gsl::not_null<float*> signalPtr, gsl::not_null<float*> outPtr, gsl::not_null<const float*> windowPtr, const size_t interval, const size_t length) :
 		signalPtr(signalPtr), outPtr(outPtr), windowPtr(windowPtr), interval(interval), length(length) {}
 
 	static void DispatchFFT(gsl::not_null<const float*> signalPtr, gsl::not_null<float*> outPtr, const size_t length, const size_t interval, const size_t intervalOffset, const int32_t flags) {
@@ -95,8 +104,8 @@ private:
 	}
 };
 
-LibFunc bool CreateFFTProps(const float* signalPtr, float* outPtr, const float* windowPtr, const size_t length, const size_t interval, const char* fileName, FFTProperties& props) {
-	NotNullSpan<const float> signal(signalPtr, length);
+LibFunc bool CreateFFTProps(float* signalPtr, float* outPtr, const float* windowPtr, const size_t length, const size_t interval, const char* fileName, FFTProperties& props) {
+	NotNullSpan<float>		 signal(signalPtr, length);
 	NotNullSpan<float>		 out(outPtr,	   length);
 	NotNullSpan<const float> window(windowPtr, interval);
 
